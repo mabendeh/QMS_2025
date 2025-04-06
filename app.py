@@ -3,14 +3,13 @@ import pandas as pd
 import uuid
 import os
 from datetime import datetime
-import matplotlib.pyplot as plt
 
 # Configuration Constants
 UPLOAD_DIR = "uploaded_documents"
 DB_FILE = "nc_log.csv"
 COLUMNS = [
     "timestamp", "mrb_date", "shift", "ccsa_item", "prod_date", "odd_even", "held_by",
-    "defect", "location_found", "disposition", "filename", "severity", "cause", "corrective_action"
+    "defect", "location_found", "disposition", "filename"
 ]
 ROLE = "admin"  # for now, assume admin to unlock all fields
 
@@ -37,7 +36,7 @@ def upload_file(file):
         return filename
     return ""
 
-def create_new_report(mrb_date, shift, ccsa_item, prod_date, odd_even, held_by, defect, location_found, disposition, filename, severity, cause, corrective_action):
+def create_new_report(mrb_date, shift, ccsa_item, prod_date, odd_even, held_by, defect, location_found, disposition, filename):
     return pd.DataFrame([{
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "mrb_date": mrb_date,
@@ -49,10 +48,7 @@ def create_new_report(mrb_date, shift, ccsa_item, prod_date, odd_even, held_by, 
         "defect": defect,
         "location_found": location_found,
         "disposition": disposition,
-        "filename": filename,
-        "severity": severity,
-        "cause": cause,
-        "corrective_action": corrective_action
+        "filename": filename
     }])
 
 # Page Layout
@@ -66,27 +62,24 @@ with st.form("nc_form", clear_on_submit=True):
         mrb_date = st.date_input("🗓️ MRB Date")
         shift = st.selectbox("🕒 Shift", ["A", "B", "C"])
         odd_even = st.radio("🔄 Odd / Even", ["Odd", "Even"], horizontal=True)
-        severity = st.selectbox("🔴 Severity", ["Low", "Medium", "High"])
     
     with col2:
         ccsa_item = st.text_input("🧾 CCSA Item (Scan)")
         prod_date = st.date_input("🏭 Production Date")
         held_by = st.text_input("🧑 Placed on Hold By")
-        cause = st.text_input("🔍 Cause of Defect")
     
     with col3:
         defect = st.text_input("❌ Defect Description")
         location_found = st.selectbox("📍 Location Found", ["Incoming", "In-Process", "Final", "Customer"])
         disposition = st.selectbox("🔒 Disposition (Leads Only)", ["", "Scrap", "Rework", "Use As-Is", "Hold"]) if ROLE == "admin" else "Pending"
-        corrective_action = st.text_input("🔧 Corrective Action")
-
+    
     file = st.file_uploader("📎 Upload File (image/pdf, optional)", type=["png", "jpg", "jpeg", "pdf"])
     
     submitted = st.form_submit_button("✅ Submit Report")
     
     if submitted:
         filename = upload_file(file)
-        new_report = create_new_report(mrb_date, shift, ccsa_item, prod_date, odd_even, held_by, defect, location_found, disposition, filename, severity, cause, corrective_action)
+        new_report = create_new_report(mrb_date, shift, ccsa_item, prod_date, odd_even, held_by, defect, location_found, disposition, filename)
         db = load_nc_data()
         db = pd.concat([db, new_report], ignore_index=True)
         save_nc_data(db)
@@ -115,17 +108,3 @@ else:
             df = df[df["location_found"].isin(filter_location)]
     
     st.dataframe(df, use_container_width=True)
-
-    # Export to Excel
-    st.download_button(
-        label="📥 Export to Excel",
-        data=df.to_excel(index=False),
-        file_name="nc_reports.xlsx"
-    )
-
-    # Plot data
-    st.markdown("### 📊 Report Statistics")
-    severity_counts = df['severity'].value_counts()
-    fig, ax = plt.subplots()
-    severity_counts.plot(kind='bar', ax=ax)
-    st.pyplot(fig)
